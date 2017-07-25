@@ -17,8 +17,18 @@ if not os.path.exists(complete_dataset_path):
 
 import zipfile
 
-with zipfile.ZipFile(small_dataset_path, "r") as z:
-    z.extractall(datasets_path)
+if not os.path.exists(small_dataset_path):
+    with zipfile.ZipFile(small_dataset_path, "r") as z:
+        z.extractall(datasets_path)
 
-with zipfile.ZipFile(complete_dataset_path, "r") as z:
-    z.extractall(datasets_path)
+if not os.path.exists(complete_dataset_path):
+    with zipfile.ZipFile(complete_dataset_path, "r") as z:
+        z.extractall(datasets_path)
+
+small_ratings_file = os.path.join(datasets_path, 'ml-latest-small', 'ratings.csv')
+
+# initiate an RDD with the ratings raw file
+from pyspark.context import SparkContext
+sc = SparkContext('local', 'movie-recommender-engine')
+small_ratings_raw_data = sc.textFile(small_ratings_file)
+small_ratings_raw_data_header = small_ratings_raw_data.take(1)[0]
