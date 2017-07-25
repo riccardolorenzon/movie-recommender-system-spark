@@ -32,3 +32,6 @@ from pyspark.context import SparkContext
 sc = SparkContext('local', 'movie-recommender-engine')
 small_ratings_raw_data = sc.textFile(small_ratings_file)
 small_ratings_raw_data_header = small_ratings_raw_data.take(1)[0]
+
+data = small_ratings_raw_data.filter(lambda line: line!=small_ratings_raw_data_header)\
+    .map(lambda line: line.split(",")).map(lambda tokens: (tokens[0],tokens[1],tokens[2])).cache()
