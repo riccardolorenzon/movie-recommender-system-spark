@@ -10,5 +10,15 @@ small_dataset_path = os.path.join(datasets_path, 'ml-latest-small.zip')
 
 from urllib.request import urlretrieve
 
-small_f = urlretrieve (small_dataset_url, small_dataset_path)
-complete_f = urlretrieve (complete_dataset_url, complete_dataset_path)
+if not os.path.exists(small_dataset_path):
+    small_f = urlretrieve (small_dataset_url, small_dataset_path)
+if not os.path.exists(complete_dataset_path):
+    complete_f = urlretrieve (complete_dataset_url, complete_dataset_path)
+
+import zipfile
+
+with zipfile.ZipFile(small_dataset_path, "r") as z:
+    z.extractall(datasets_path)
+
+with zipfile.ZipFile(complete_dataset_path, "r") as z:
+    z.extractall(datasets_path)
