@@ -48,6 +48,7 @@ small_movies_raw_data_header = small_movies_raw_data.take(1)[0]
 # Parse the Raw data into a new RDD - Movies.
 small_movies_data = small_movies_raw_data.filter(lambda line: line!=small_movies_raw_data_header)\
     .map(lambda line: line.split(",")).map(lambda tokens: (tokens[0],tokens[1])).cache()
+small_movies_titles = small_movies_data.map(lambda x: (int(x[0]),x[1]))
 
 # Prepare RDDs for training/validation/test
 training_RDD, validation_RDD, test_RDD = small_ratings_data.randomSplit([6, 2, 2], seed=0)
@@ -130,8 +131,36 @@ small_data_with_new_ratings_RDD = small_ratings_data.union(new_user_ratings_RDD)
 from time import time
 
 t0 = time()
-new_ratings_model = ALS.train(complete_data_with_new_ratings_RDD, best_rank, seed=seed,
+new_ratings_model = ALS.train(small_data_with_new_ratings_RDD, best_rank, seed=seed,
                               iterations=iterations, lambda_=regularization_parameter)
 tt = time() - t0
 
 print("New model trained in {} seconds".format(round(tt,3)))
+
+new_user_ratings_ids = map(lambda x: x[1], new_user_ratings) # get just movie IDs
+# keep just those not on the ID list (thanks Lei Li for spotting the error!)
+new_user_unrated_movies_RDD = (small_movies_data.filter(lambda x: x[0] not in new_user_ratings_ids).map(lambda x: (new_user_ID, x[0])))
+
+# Use the input RDD, new_user_unrated_movies_RDD, with new_ratings_model.predictAll() to predict new ratings for the movies
+new_user_recommendations_RDD = new_ratings_model.predictAll(new_user_unrated_movies_RDD)
+
+# Transform new_user_recommendations_RDD into pairs of the form (Movie ID, Predicted Rating)
+new_user_recommendations_rating_RDD = new_user_recommendations_RDD.map(lambda x: (x.product, x.rating))
+new_user_recommendations_rating_title_and_count_RDD = \
+    new_user_recommendations_rating_RDD.join(small_movies_titles).join(movie_rating_counts_RDD)
+new_user_recommendations_rating_title_and_count_RDD = \
+    new_user_recommendations_rating_title_and_count_RDD.map(lambda r: (r[1][0][1], r[1][0][0], r[1][1]))
+
+# Get the predicted rating for a specific movie
+my_movie = sc.parallelize([(0, 500)]) # Quiz Show (1994)
+individual_movie_rating_RDD = new_ratings_model.predictAll(new_user_unrated_movies_RDD)
+print(individual_movie_rating_RDD.take(1))
+
+# Parquet-persistance of the ALS model
+from pyspark.mllib.recommendation import MatrixFactorizationModel
+
+model_path = os.path.join('..', 'models', 'movie_lens_als')
+
+# Save and load model
+model.save(sc, model_path)
+same_model = MatrixFactorizationModel.load(sc, model_path)
