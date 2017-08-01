@@ -47,3 +47,10 @@ small_movies_raw_data_header = small_movies_raw_data.take(1)[0]
 # Parse the Raw data into a new RDD - Movies.
 small_movies_data = small_movies_raw_data.filter(lambda line: line!=small_movies_raw_data_header)\
     .map(lambda line: line.split(",")).map(lambda tokens: (tokens[0],tokens[1])).cache()
+
+# Prepare RDDs for training/validation/test
+training_RDD, validation_RDD, test_RDD = small_ratings_data.randomSplit([6, 2, 2], seed=0L)
+
+# Map validation and test RDDs
+validation_for_predict_RDD = validation_RDD.map(lambda x: (x[0], x[1]))
+test_for_predict_RDD = test_RDD.map(lambda x: (x[0], x[1]))
