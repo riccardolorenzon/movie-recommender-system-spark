@@ -85,3 +85,53 @@ for rank in ranks:
         best_rank = rank
 
 print ('The best model was trained with rank {}'.format(best_rank))
+
+# Evaluate cost function of the trained model
+model = ALS.train(training_RDD, best_rank, seed=seed, iterations=iterations,
+                      lambda_=regularization_parameter)
+predictions = model.predictAll(test_for_predict_RDD).map(lambda r: ((r[0], r[1]), r[2]))
+rates_and_preds = test_RDD.map(lambda r: ((int(r[0]), int(r[1])), float(r[2]))).join(predictions)
+error = math.sqrt(rates_and_preds.map(lambda r: (r[1][0] - r[1][1])**2).mean())
+
+print ('For testing data the RMSE is {}'.format(error))
+
+# Filter movies by minimum ranking
+def get_counts_and_averages(ID_and_ratings_tuple):
+    nratings = len(ID_and_ratings_tuple[1])
+    return ID_and_ratings_tuple[0], (nratings, float(sum(x for x in ID_and_ratings_tuple[1]))/nratings)
+
+movie_ID_with_ratings_RDD = (small_ratings_data.map(lambda x: (x[1], x[2])).groupByKey())
+movie_ID_with_avg_ratings_RDD = movie_ID_with_ratings_RDD.map(get_counts_and_averages)
+movie_rating_counts_RDD = movie_ID_with_avg_ratings_RDD.map(lambda x: (x[0], x[1][0]))
+
+# Example of adding new datasets
+new_user_ID = 0
+
+# The format of each line is (userID, movieID, rating)
+new_user_ratings = [
+     (0,260,4), # Star Wars (1977)
+     (0,1,3), # Toy Story (1995)
+     (0,16,3), # Casino (1995)
+     (0,25,4), # Leaving Las Vegas (1995)
+     (0,32,4), # Twelve Monkeys (a.k.a. 12 Monkeys) (1995)
+     (0,335,1), # Flintstones, The (1994)
+     (0,379,1), # Timecop (1994)
+     (0,296,3), # Pulp Fiction (1994)
+     (0,858,5) , # Godfather, The (1972)
+     (0,50,4) # Usual Suspects, The (1995)
+    ]
+new_user_ratings_RDD = sc.parallelize(new_user_ratings)
+print ('New user ratings: {}'.format(new_user_ratings_RDD.take(10)))
+
+small_data_with_new_ratings_RDD = small_ratings_data.union(new_user_ratings_RDD)
+
+# Train the model with the new additional data and the best rank calculated in the previous steps
+
+from time import time
+
+t0 = time()
+new_ratings_model = ALS.train(complete_data_with_new_ratings_RDD, best_rank, seed=seed,
+                              iterations=iterations, lambda_=regularization_parameter)
+tt = time() - t0
+
+print("New model trained in {} seconds".format(round(tt,3)))
